@@ -1,0 +1,111 @@
+function Navbar({ user, onLogout, setPage }) {
+  if (!user) return null;
+
+  const isMarketplaceUser =
+    user.role === "customer" || user.role === "property_owner";
+
+  const title = isMarketplaceUser ? "Local Marketplace" : "Job Portal";
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        background: "linear-gradient(90deg,#4e54c8,#8f94fb)",
+        color: "white",
+        padding: "14px 28px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
+        boxSizing: "border-box",
+        position: "sticky",
+        top: 0,
+        zIndex: 20,
+        flexWrap: "wrap",
+        gap: "12px"
+      }}
+    >
+      <h2 style={{ margin: 0, fontWeight: "700", letterSpacing: "0.5px" }}>
+        {title}
+      </h2>
+
+      <div
+        style={{
+          display: "flex",
+          gap: "12px",
+          alignItems: "center",
+          flexWrap: "wrap"
+        }}
+      >
+        {!isMarketplaceUser && (
+          <>
+            <button onClick={() => setPage("jobs")} style={navButtonStyle}>
+              Jobs
+            </button>
+
+            <button onClick={() => setPage("dashboard")} style={navButtonStyle}>
+              Dashboard
+            </button>
+          </>
+        )}
+
+        {isMarketplaceUser && (
+          <>
+            <button
+              onClick={() => setPage("marketplace-home")}
+              style={navButtonStyle}
+            >
+              Home
+            </button>
+
+            <button
+              onClick={() => setPage("marketplace-dashboard")}
+              style={navButtonStyle}
+            >
+              Dashboard
+            </button>
+
+            <button
+              onClick={() => setPage("post-listing")}
+              style={navButtonStyle}
+            >
+              Post Listing
+            </button>
+
+            <button onClick={() => setPage("favorites")} style={navButtonStyle}>
+              Favorites
+            </button>
+          </>
+        )}
+
+        <span style={{ opacity: 0.96, fontWeight: "600" }}>
+          {user.name} ({user.role})
+        </span>
+
+        <button
+          onClick={onLogout}
+          style={{
+            ...navButtonStyle,
+            background: "#ff6b6b",
+            color: "white"
+          }}
+        >
+          Logout
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const navButtonStyle = {
+  border: "none",
+  padding: "8px 14px",
+  borderRadius: "10px",
+  background: "white",
+  color: "#4e54c8",
+  fontWeight: "700",
+  cursor: "pointer",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.08)"
+};
+
+export default Navbar;

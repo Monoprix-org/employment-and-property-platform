@@ -1,0 +1,67 @@
+function InquiryCard({ item, isOwner = false }) {
+  return (
+    <div
+      style={{
+        background: "#fff",
+        borderRadius: "18px",
+        padding: "22px",
+        boxShadow: "0 8px 22px rgba(0,0,0,0.08)",
+        border: "1px solid #edf0f6",
+        marginBottom: "16px"
+      }}
+    >
+      <h3 style={{ marginTop: 0, marginBottom: "10px" }}>
+        {item.title || "Listing"}
+      </h3>
+
+      <p style={metaStyle}><b>Status:</b> {item.status}</p>
+
+      {isOwner && (
+        <p style={metaStyle}>
+          <b>Sender:</b> {item.sender_name || item.sender_email || "Unknown"}
+        </p>
+      )}
+
+      {!isOwner && (
+        <p style={metaStyle}>
+          <b>Sent to listing:</b> {item.title || "Unknown listing"}
+        </p>
+      )}
+
+      <p style={messageStyle}>
+        <b>Message:</b> {item.message}
+      </p>
+
+      {item.phone ? (
+        <p style={metaStyle}>
+          <b>Phone:</b> {item.phone}
+        </p>
+      ) : null}
+
+      <p style={timeStyle}>
+        {item.created_at
+          ? new Date(item.created_at).toLocaleString()
+          : ""}
+      </p>
+    </div>
+  );
+}
+
+const metaStyle = {
+  margin: "0 0 8px",
+  color: "#444"
+};
+
+const messageStyle = {
+  margin: "10px 0",
+  color: "#333",
+  lineHeight: 1.6
+};
+
+const timeStyle = {
+  marginTop: "12px",
+  color: "#888",
+  fontSize: "13px"
+};
+
+export default InquiryCard;

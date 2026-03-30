@@ -1,0 +1,175 @@
+function JobCard({ job, user, onApplyClick }) {
+  return (
+    <div style={cardStyle}>
+      <div style={glowStyle} />
+
+      <div style={topRowStyle}>
+        <div>
+          <div style={badgeStyle}>Open Position</div>
+          <h3 style={titleStyle}>{job.title}</h3>
+        </div>
+
+        <div style={payChipStyle}>
+          ${job.pay_rate}
+        </div>
+      </div>
+
+      <p style={descStyle}>{job.description}</p>
+
+      <div style={infoGridStyle}>
+        <div style={infoCardStyle}>
+          <div style={infoLabelStyle}>Job Type</div>
+          <div style={infoValueStyle}>{job.job_type || "N/A"}</div>
+        </div>
+
+        <div style={infoCardStyle}>
+          <div style={infoLabelStyle}>Location</div>
+          <div style={infoValueStyle}>{job.location || "N/A"}</div>
+        </div>
+
+        <div style={infoCardStyle}>
+          <div style={infoLabelStyle}>Date</div>
+          <div style={infoValueStyle}>
+            {job.job_date ? new Date(job.job_date).toLocaleDateString() : "N/A"}
+          </div>
+        </div>
+
+        <div style={infoCardStyle}>
+          <div style={infoLabelStyle}>Employer</div>
+          <div style={infoValueStyle}>{job.employer_name || "N/A"}</div>
+        </div>
+      </div>
+
+      {user?.role === "worker" && (
+        <div style={{ marginTop: "18px" }}>
+          <button
+            onClick={() => onApplyClick(job.id)}
+            style={applyButtonStyle}
+          >
+            Apply Now
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const cardStyle = {
+  position: "relative",
+  overflow: "hidden",
+  background: "rgba(255,255,255,0.05)",
+  borderRadius: "24px",
+  padding: "24px",
+  boxShadow: "0 18px 38px rgba(0,0,0,0.22)",
+  border: "1px solid rgba(255,255,255,0.08)",
+  backdropFilter: "blur(16px)",
+  marginBottom: "20px",
+  color: "#fff"
+};
+
+const glowStyle = {
+  position: "absolute",
+  width: "180px",
+  height: "180px",
+  borderRadius: "50%",
+  background: "rgba(79,70,229,0.18)",
+  filter: "blur(70px)",
+  top: "-50px",
+  right: "-30px",
+  pointerEvents: "none"
+};
+
+const topRowStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "16px",
+  alignItems: "flex-start",
+  flexWrap: "wrap",
+  position: "relative",
+  zIndex: 2
+};
+
+const badgeStyle = {
+  display: "inline-block",
+  padding: "7px 12px",
+  borderRadius: "999px",
+  background: "rgba(6,182,212,0.12)",
+  border: "1px solid rgba(6,182,212,0.18)",
+  color: "#8be9f7",
+  fontSize: "12px",
+  fontWeight: "800",
+  letterSpacing: "0.4px",
+  textTransform: "uppercase",
+  marginBottom: "12px"
+};
+
+const titleStyle = {
+  margin: 0,
+  fontSize: "28px",
+  fontWeight: "800",
+  color: "#fff",
+  letterSpacing: "-0.4px"
+};
+
+const payChipStyle = {
+  padding: "10px 14px",
+  borderRadius: "14px",
+  background: "linear-gradient(135deg, rgba(79,70,229,0.22) 0%, rgba(124,58,237,0.18) 55%, rgba(6,182,212,0.16) 100%)",
+  border: "1px solid rgba(255,255,255,0.1)",
+  color: "#fff",
+  fontWeight: "800",
+  fontSize: "16px",
+  whiteSpace: "nowrap"
+};
+
+const descStyle = {
+  marginTop: "16px",
+  marginBottom: "18px",
+  color: "rgba(255,255,255,0.76)",
+  lineHeight: 1.8,
+  fontSize: "15px",
+  position: "relative",
+  zIndex: 2
+};
+
+const infoGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "12px",
+  position: "relative",
+  zIndex: 2
+};
+
+const infoCardStyle = {
+  padding: "14px",
+  borderRadius: "16px",
+  background: "rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.06)"
+};
+
+const infoLabelStyle = {
+  color: "rgba(255,255,255,0.6)",
+  fontSize: "12px",
+  marginBottom: "6px",
+  textTransform: "uppercase",
+  letterSpacing: "0.4px"
+};
+
+const infoValueStyle = {
+  color: "#fff",
+  fontWeight: "700",
+  lineHeight: 1.5
+};
+
+const applyButtonStyle = {
+  padding: "12px 18px",
+  border: "none",
+  borderRadius: "14px",
+  background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 55%, #06b6d4 100%)",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: "800",
+  boxShadow: "0 14px 26px rgba(79,70,229,0.26)"
+};
+
+export default JobCard;

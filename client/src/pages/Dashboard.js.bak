@@ -1,0 +1,752 @@
+import React, { useEffect, useMemo, useState } from "react";
+
+function Dashboard({ token, user }) {
+  const [jobs, setJobs] = useState([]);
+  const [applications, setApplications] = useState({});
+  const [myApplications, setMyApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [form, setForm] = useState({
+    title: "",
+    job_type: "casual",
+    description: "",
+    location: "",
+    pay_rate: "",
+    job_date: ""
+  });
+
+  const fetchJobs = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/jobs");
+      const data = await res.json();
+
+      if (user.role === "employer") {
+        const employerJobs = Array.isArray(data)
+          ? data.filter((job) => Number(job.created_by) === Number(user.id))
+          : [];
+        setJobs(employerJobs);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchMyApplications = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/applications/my", {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+      setMyApplications(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const createJob = async (e) => {
+    e.preventDefault();
+
+    try {
+      const res = await fetch("http://localhost:5000/jobs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(form)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to create job");
+      }
+
+      alert(data.message || "Job created successfully");
+
+      setForm({
+        title: "",
+        job_type: "casual",
+        description: "",
+        location: "",
+        pay_rate: "",
+        job_date: ""
+      });
+
+      fetchJobs();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Failed to create job");
+    }
+  };
+
+  const fetchApplications = async (jobId) => {
+    try {
+      const res = await fetch(`http://localhost:5000/jobs/${jobId}/applications`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+
+      setApplications((prev) => ({
+        ...prev,
+        [jobId]: Array.isArray(data) ? data : []
+      }));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const deleteJob = async (jobId) => {
+    const confirmed = window.confirm("Are you sure you want to delete this job?");
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/jobs/${jobId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to delete job");
+      }
+
+      alert(data.message || "Job deleted");
+
+      setJobs((prev) => prev.filter((job) => job.id !== jobId));
+
+      setApplications((prev) => {
+        const updated = { ...prev };
+        delete updated[jobId];
+        return updated;
+      });
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Failed to delete job");
+    }
+  };
+
+  useEffect(() => {
+    const run = async () => {
+      setLoading(true);
+
+      if (user.role === "employer") {
+        await fetchJobs();
+      } else if (user.role === "worker") {
+        await fetchMyApplications();
+      }
+
+      setLoading(false);
+    };
+
+    run();
+  }, [user.role]);
+
+  const workerStats = useMemo(() => {
+    return {
+      total: myApplications.length,
+      withResume: myApplications.filter((app) => !!app.resume_url).length
+    };
+  }, [myApplications]);
+
+  const employerStats = useMemo(() => {
+    const totalApplications = Object.values(applications).reduce(
+      (sum, list) => sum + (Array.isArray(list) ? list.length : 0),
+      0
+    );
+
+    return {
+      jobs: jobs.length,
+      applications: totalApplications
+    };
+  }, [jobs, applications]);
+
+  if (loading) {
+    return (
+      <div style={pageWrapStyle}>
+        <div style={glassCardStyle}>Loading dashboard...</div>
+      </div>
+    );
+  }
+
+  if (user.role === "worker") {
+    return (
+      <div style={pageWrapStyle}>
+        <div style={heroBannerStyle}>
+          <div style={heroGlowOne} />
+          <div style={heroGlowTwo} />
+
+          <div style={{ position: "relative", zIndex: 2 }}>
+            <div style={heroBadgeStyle}>Worker Workspace</div>
+            <h1 style={heroTitleStyle}>Track your applications in one place</h1>
+            <p style={heroDescStyle}>
+              Review your submitted applications, job details, contact records,
+              cover letters, and uploaded resume files through a cleaner dashboard.
+            </p>
+          </div>
+
+          <div style={statsGridStyle}>
+            <div style={statCardStyle}>
+              <div style={statNumberStyle}>{workerStats.total}</div>
+              <div style={statLabelStyle}>Applications</div>
+            </div>
+
+            <div style={statCardStyle}>
+              <div style={statNumberStyle}>{workerStats.withResume}</div>
+              <div style={statLabelStyle}>With Resume</div>
+            </div>
+
+            <div style={statCardStyle}>
+              <div style={statNumberStyle}>Worker</div>
+              <div style={statLabelStyle}>Current Role</div>
+            </div>
+          </div>
+        </div>
+
+        <h2 style={sectionTitleStyle}>My Applications</h2>
+
+        {myApplications.length === 0 ? (
+          <div style={glassCardStyle}>
+            You have not applied for any jobs yet.
+          </div>
+        ) : (
+          myApplications.map((app) => (
+            <div key={app.id} style={glassCardStyle}>
+              <h3 style={cardTitleStyle}>{app.title}</h3>
+
+              <div style={infoGridStyle}>
+                <div style={miniInfoCardStyle}>
+                  <div style={infoLabelStyle}>Status</div>
+                  <div style={infoValueStyle}>{app.status}</div>
+                </div>
+
+                <div style={miniInfoCardStyle}>
+                  <div style={infoLabelStyle}>Job Type</div>
+                  <div style={infoValueStyle}>{app.job_type || "N/A"}</div>
+                </div>
+
+                <div style={miniInfoCardStyle}>
+                  <div style={infoLabelStyle}>Location</div>
+                  <div style={infoValueStyle}>{app.location || "N/A"}</div>
+                </div>
+
+                <div style={miniInfoCardStyle}>
+                  <div style={infoLabelStyle}>Pay</div>
+                  <div style={infoValueStyle}>
+                    {app.pay_rate ? `$${app.pay_rate}` : "N/A"}
+                  </div>
+                </div>
+
+                <div style={miniInfoCardStyle}>
+                  <div style={infoLabelStyle}>Employer</div>
+                  <div style={infoValueStyle}>{app.employer_name || "N/A"}</div>
+                </div>
+
+                <div style={miniInfoCardStyle}>
+                  <div style={infoLabelStyle}>Job Date</div>
+                  <div style={infoValueStyle}>
+                    {app.job_date
+                      ? new Date(app.job_date).toLocaleDateString()
+                      : "N/A"}
+                  </div>
+                </div>
+
+                <div style={miniInfoCardStyle}>
+                  <div style={infoLabelStyle}>Applied At</div>
+                  <div style={infoValueStyle}>
+                    {new Date(app.created_at).toLocaleString()}
+                  </div>
+                </div>
+
+                {app.phone && (
+                  <div style={miniInfoCardStyle}>
+                    <div style={infoLabelStyle}>Phone</div>
+                    <div style={infoValueStyle}>{app.phone}</div>
+                  </div>
+                )}
+              </div>
+
+              {app.cover_letter && (
+                <div style={subCardStyle}>
+                  <div style={subCardTitleStyle}>Cover Letter</div>
+                  <p style={subCardTextStyle}>{app.cover_letter}</p>
+                </div>
+              )}
+
+              {app.resume_url && (
+                <a
+                  href={`http://localhost:5000/uploads/${app.resume_url}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={linkButtonStyle}
+                >
+                  Download My Resume
+                </a>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={pageWrapStyle}>
+      <div style={heroBannerStyle}>
+        <div style={heroGlowOne} />
+        <div style={heroGlowTwo} />
+
+        <div style={{ position: "relative", zIndex: 2 }}>
+          <div style={heroBadgeStyle}>Employer Control Center</div>
+          <h1 style={heroTitleStyle}>Build teams with a smarter dashboard</h1>
+          <p style={heroDescStyle}>
+            Create jobs, define job type, review applicants, and manage postings
+            through a unified recruitment workspace.
+          </p>
+        </div>
+
+        <div style={statsGridStyle}>
+          <div style={statCardStyle}>
+            <div style={statNumberStyle}>{employerStats.jobs}</div>
+            <div style={statLabelStyle}>Posted Jobs</div>
+          </div>
+
+          <div style={statCardStyle}>
+            <div style={statNumberStyle}>{employerStats.applications}</div>
+            <div style={statLabelStyle}>Loaded Applications</div>
+          </div>
+
+          <div style={statCardStyle}>
+            <div style={statNumberStyle}>Employer</div>
+            <div style={statLabelStyle}>Current Role</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={dashboardGridStyle}>
+        <div style={glassCardStyle}>
+          <h3 style={cardTitleStyle}>Create Job</h3>
+
+          <form onSubmit={createJob} style={formStackStyle}>
+            <input
+              placeholder="Title"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              style={techInputStyle}
+            />
+
+            <select
+              value={form.job_type}
+              onChange={(e) => setForm({ ...form, job_type: e.target.value })}
+              style={techInputStyle}
+            >
+              <option value="permanent">Permanent</option>
+              <option value="casual">Casual</option>
+              <option value="parttime">Part Time</option>
+              <option value="one_off">One Off</option>
+            </select>
+
+            <textarea
+              placeholder="Description"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              rows="4"
+              style={{ ...techInputStyle, resize: "vertical", minHeight: "110px" }}
+            />
+
+            <input
+              placeholder="Location"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              style={techInputStyle}
+            />
+
+            <input
+              placeholder="Pay rate"
+              value={form.pay_rate}
+              onChange={(e) => setForm({ ...form, pay_rate: e.target.value })}
+              style={techInputStyle}
+            />
+
+            <input
+              type="date"
+              value={form.job_date}
+              onChange={(e) => setForm({ ...form, job_date: e.target.value })}
+              style={techInputStyle}
+            />
+
+            <button type="submit" style={mainButtonStyle}>
+              Create Job
+            </button>
+          </form>
+        </div>
+
+        <div>
+          <h2 style={sectionTitleStyle}>Your Posted Jobs</h2>
+
+          {jobs.length === 0 ? (
+            <div style={glassCardStyle}>
+              You have not posted any jobs yet.
+            </div>
+          ) : (
+            jobs.map((job) => (
+              <div key={job.id} style={glassCardStyle}>
+                <h3 style={cardTitleStyle}>{job.title}</h3>
+                <p style={bodyTextStyle}>{job.description}</p>
+
+                <div style={infoGridStyle}>
+                  <div style={miniInfoCardStyle}>
+                    <div style={infoLabelStyle}>Job Type</div>
+                    <div style={infoValueStyle}>{job.job_type || "N/A"}</div>
+                  </div>
+
+                  <div style={miniInfoCardStyle}>
+                    <div style={infoLabelStyle}>Location</div>
+                    <div style={infoValueStyle}>{job.location}</div>
+                  </div>
+
+                  <div style={miniInfoCardStyle}>
+                    <div style={infoLabelStyle}>Pay</div>
+                    <div style={infoValueStyle}>${job.pay_rate}</div>
+                  </div>
+
+                  <div style={miniInfoCardStyle}>
+                    <div style={infoLabelStyle}>Date</div>
+                    <div style={infoValueStyle}>
+                      {new Date(job.job_date).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={actionRowStyle}>
+                  <button
+                    onClick={() => fetchApplications(job.id)}
+                    style={viewButtonStyle}
+                  >
+                    View Applications
+                  </button>
+
+                  <button
+                    onClick={() => deleteJob(job.id)}
+                    style={deleteButtonStyle}
+                  >
+                    Delete Job
+                  </button>
+                </div>
+
+                {applications[job.id] && (
+                  <div style={{ marginTop: "20px" }}>
+                    {applications[job.id].length === 0 ? (
+                      <div style={subCardStyle}>No applications yet.</div>
+                    ) : (
+                      applications[job.id].map((app) => (
+                        <div key={app.id} style={subCardStyle}>
+                          <div style={subCardTitleStyle}>{app.name}</div>
+
+                          <div style={subInfoGridStyle}>
+                            <div><b>Email:</b> {app.email}</div>
+                            <div><b>Phone:</b> {app.phone || "N/A"}</div>
+                          </div>
+
+                          {app.cover_letter && (
+                            <p style={subCardTextStyle}>
+                              <b>Cover Letter:</b> {app.cover_letter}
+                            </p>
+                          )}
+
+                          {app.resume_url && (
+                            <a
+                              href={`http://localhost:5000/uploads/${app.resume_url}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={linkButtonStyle}
+                            >
+                              Download Resume
+                            </a>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const pageWrapStyle = {
+  maxWidth: "1240px",
+  margin: "26px auto 40px",
+  padding: "0 20px"
+};
+
+const heroBannerStyle = {
+  position: "relative",
+  overflow: "hidden",
+  borderRadius: "28px",
+  padding: "34px",
+  marginBottom: "24px",
+  background:
+    "linear-gradient(135deg, rgba(79,70,229,0.18) 0%, rgba(124,58,237,0.16) 45%, rgba(6,182,212,0.12) 100%)",
+  border: "1px solid rgba(255,255,255,0.1)",
+  backdropFilter: "blur(18px)",
+  boxShadow: "0 22px 50px rgba(0,0,0,0.24)"
+};
+
+const heroGlowOne = {
+  position: "absolute",
+  width: "260px",
+  height: "260px",
+  borderRadius: "50%",
+  background: "rgba(34,211,238,0.16)",
+  filter: "blur(80px)",
+  top: "-90px",
+  right: "6%"
+};
+
+const heroGlowTwo = {
+  position: "absolute",
+  width: "240px",
+  height: "240px",
+  borderRadius: "50%",
+  background: "rgba(139,92,246,0.18)",
+  filter: "blur(90px)",
+  bottom: "-100px",
+  left: "-50px"
+};
+
+const heroBadgeStyle = {
+  display: "inline-block",
+  padding: "8px 14px",
+  borderRadius: "999px",
+  background: "rgba(255,255,255,0.08)",
+  border: "1px solid rgba(255,255,255,0.1)",
+  color: "#c4b5fd",
+  fontSize: "13px",
+  fontWeight: "700",
+  marginBottom: "16px"
+};
+
+const heroTitleStyle = {
+  margin: 0,
+  color: "#fff",
+  fontSize: "42px",
+  lineHeight: 1.08,
+  fontWeight: "800",
+  letterSpacing: "-0.6px"
+};
+
+const heroDescStyle = {
+  marginTop: "14px",
+  maxWidth: "760px",
+  color: "rgba(255,255,255,0.76)",
+  lineHeight: 1.8,
+  fontSize: "16px"
+};
+
+const statsGridStyle = {
+  marginTop: "24px",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "14px",
+  position: "relative",
+  zIndex: 2
+};
+
+const statCardStyle = {
+  padding: "18px",
+  borderRadius: "18px",
+  background: "rgba(255,255,255,0.05)",
+  border: "1px solid rgba(255,255,255,0.08)"
+};
+
+const statNumberStyle = {
+  color: "#fff",
+  fontSize: "28px",
+  fontWeight: "800"
+};
+
+const statLabelStyle = {
+  marginTop: "6px",
+  color: "rgba(255,255,255,0.68)",
+  fontSize: "13px"
+};
+
+const dashboardGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "minmax(320px, 420px) 1fr",
+  gap: "24px",
+  alignItems: "start"
+};
+
+const glassCardStyle = {
+  background: "rgba(255,255,255,0.05)",
+  borderRadius: "24px",
+  padding: "24px",
+  boxShadow: "0 18px 38px rgba(0,0,0,0.22)",
+  border: "1px solid rgba(255,255,255,0.08)",
+  backdropFilter: "blur(16px)",
+  marginBottom: "20px",
+  color: "#fff"
+};
+
+const cardTitleStyle = {
+  marginTop: 0,
+  marginBottom: "14px",
+  color: "#fff",
+  fontSize: "24px",
+  fontWeight: "800"
+};
+
+const sectionTitleStyle = {
+  marginBottom: "16px",
+  color: "#fff",
+  fontSize: "24px",
+  fontWeight: "800"
+};
+
+const formStackStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "14px"
+};
+
+const techInputStyle = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "13px 16px",
+  borderRadius: "14px",
+  border: "1px solid rgba(255,255,255,0.12)",
+  outline: "none",
+  fontSize: "15px",
+  background: "rgba(255,255,255,0.06)",
+  color: "#fff",
+  backdropFilter: "blur(10px)"
+};
+
+const mainButtonStyle = {
+  padding: "12px 18px",
+  border: "none",
+  borderRadius: "14px",
+  background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 55%, #06b6d4 100%)",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: "800",
+  boxShadow: "0 14px 26px rgba(79,70,229,0.26)"
+};
+
+const viewButtonStyle = {
+  padding: "11px 16px",
+  borderRadius: "14px",
+  border: "none",
+  background: "linear-gradient(135deg, #06b6d4 0%, #2563eb 100%)",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: "700",
+  boxShadow: "0 12px 22px rgba(37,99,235,0.24)"
+};
+
+const deleteButtonStyle = {
+  padding: "11px 16px",
+  borderRadius: "14px",
+  border: "none",
+  background: "linear-gradient(135deg, #fb7185 0%, #ff6b6b 100%)",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: "700",
+  boxShadow: "0 12px 22px rgba(251,113,133,0.22)"
+};
+
+const actionRowStyle = {
+  display: "flex",
+  gap: "12px",
+  marginTop: "16px",
+  flexWrap: "wrap"
+};
+
+const infoGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "12px",
+  marginTop: "14px"
+};
+
+const miniInfoCardStyle = {
+  padding: "14px",
+  borderRadius: "16px",
+  background: "rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.06)"
+};
+
+const infoLabelStyle = {
+  color: "rgba(255,255,255,0.62)",
+  fontSize: "12px",
+  marginBottom: "6px",
+  textTransform: "uppercase",
+  letterSpacing: "0.4px"
+};
+
+const infoValueStyle = {
+  color: "#fff",
+  fontWeight: "700",
+  lineHeight: 1.5
+};
+
+const subCardStyle = {
+  marginTop: "14px",
+  padding: "16px",
+  borderRadius: "18px",
+  background: "rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.06)"
+};
+
+const subCardTitleStyle = {
+  color: "#fff",
+  fontWeight: "800",
+  marginBottom: "10px"
+};
+
+const subCardTextStyle = {
+  margin: 0,
+  color: "rgba(255,255,255,0.78)",
+  lineHeight: 1.7
+};
+
+const subInfoGridStyle = {
+  display: "grid",
+  gap: "8px",
+  color: "rgba(255,255,255,0.76)",
+  marginBottom: "10px"
+};
+
+const bodyTextStyle = {
+  color: "rgba(255,255,255,0.76)",
+  lineHeight: 1.75
+};
+
+const linkButtonStyle = {
+  display: "inline-block",
+  marginTop: "12px",
+  padding: "10px 14px",
+  borderRadius: "12px",
+  textDecoration: "none",
+  color: "#fff",
+  fontWeight: "700",
+  background: "rgba(255,255,255,0.08)",
+  border: "1px solid rgba(255,255,255,0.1)"
+};
+
+export default Dashboard;

@@ -1,0 +1,272 @@
+import { useState, useEffect } from "react";
+import Register from "./pages/Register";
+import Login from "./pages/Login";
+import JobsPage from "./pages/JobsPage";
+import Navbar from "./components/Navbar";
+import Dashboard from "./pages/Dashboard";
+
+import MarketplaceHome from "./pages/MarketplaceHome";
+import MarketplaceDashboard from "./pages/MarketplaceDashboard";
+import PostListing from "./pages/PostListing";
+import ListingDetail from "./pages/ListingDetail";
+import FavoritesPage from "./pages/FavoritesPage";
+
+function App() {
+  const [token, setToken] = useState("");
+  const [currentUser, setCurrentUser] = useState(null);
+  const [showLogin, setShowLogin] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [page, setPage] = useState("jobs");
+  const [selectedListingId, setSelectedListingId] = useState(null);
+
+  useEffect(() => {
+    const savedToken = localStorage.getItem("token");
+    if (savedToken && savedToken.length > 10) {
+      setToken(savedToken);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+
+    setLoading(true);
+
+    fetch("http://localhost:5000/auth/me", {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Invalid token");
+        return res.json();
+      })
+      .then((data) => {
+        setCurrentUser(data);
+        setLoading(false);
+        setErrorMessage("");
+
+        if (["customer", "property_owner"].includes(data.role)) {
+          setPage("marketplace-home");
+        } else {
+          setPage("jobs");
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        localStorage.removeItem("token");
+        setToken("");
+        setCurrentUser(null);
+        setShowLogin(true);
+        setLoading(false);
+        setErrorMessage("Session expired. Please login again.");
+      });
+  }, [token]);
+
+  const handleLogin = (newToken) => {
+    if (!newToken) return;
+    localStorage.setItem("token", newToken);
+    setToken(newToken);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setToken("");
+    setCurrentUser(null);
+    setShowLogin(true);
+    setPage("jobs");
+    setSelectedListingId(null);
+  };
+
+  const openListingDetail = (listingId) => {
+    setSelectedListingId(listingId);
+    setPage("listing-detail");
+  };
+
+  const isMarketplaceUser =
+    currentUser &&
+    ["customer", "property_owner"].includes(currentUser.role);
+
+  if (loading) {
+    return (
+      <div style={loadingPageStyle}>
+        <div style={loadingCardStyle}>Loading user info...</div>
+      </div>
+    );
+  }
+
+  if (!token || !currentUser) {
+    return (
+      <div>
+        {errorMessage && (
+          <div style={topErrorWrapStyle}>
+            <div style={topErrorStyle}>{errorMessage}</div>
+          </div>
+        )}
+
+        {showLogin ? (
+          <Login onLogin={handleLogin} />
+        ) : (
+          <Register onRegistered={() => setShowLogin(true)} />
+        )}
+
+        <div style={switchWrapStyle}>
+          {showLogin ? (
+            <p style={switchTextStyle}>
+              Don&apos;t have an account?
+              <button
+                onClick={() => setShowLogin(false)}
+                style={switchButtonStyle}
+              >
+                Register
+              </button>
+            </p>
+          ) : (
+            <p style={switchTextStyle}>
+              Already have an account?
+              <button
+                onClick={() => setShowLogin(true)}
+                style={switchButtonStyle}
+              >
+                Login
+              </button>
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (isMarketplaceUser) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#f5f7fb",
+          fontFamily: "Arial, sans-serif"
+        }}
+      >
+        {page === "marketplace-home" && (
+          <MarketplaceHome
+            token={token}
+            user={currentUser}
+            setPage={setPage}
+            onViewListing={openListingDetail}
+            onLogout={handleLogout}
+          />
+        )}
+
+        {page === "marketplace-dashboard" && (
+          <MarketplaceDashboard
+            token={token}
+            user={currentUser}
+            setPage={setPage}
+            onViewListing={openListingDetail}
+            onLogout={handleLogout}
+          />
+        )}
+
+        {page === "post-listing" && (
+          <PostListing
+            token={token}
+            user={currentUser}
+            setPage={setPage}
+            onLogout={handleLogout}
+          />
+        )}
+
+        {page === "listing-detail" && (
+          <ListingDetail
+            token={token}
+            user={currentUser}
+            listingId={selectedListingId}
+            setPage={setPage}
+            onLogout={handleLogout}
+          />
+        )}
+
+        {page === "favorites" && (
+          <FavoritesPage
+            token={token}
+            user={currentUser}
+            setPage={setPage}
+            onViewListing={openListingDetail}
+            onLogout={handleLogout}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#f5f7fb",
+        fontFamily: "Arial, sans-serif"
+      }}
+    >
+      <Navbar user={currentUser} onLogout={handleLogout} setPage={setPage} />
+      {page === "jobs" && <JobsPage token={token} user={currentUser} />}
+      {page === "dashboard" && <Dashboard token={token} user={currentUser} />}
+    </div>
+  );
+}
+
+const loadingPageStyle = {
+  minHeight: "100vh",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  background: "linear-gradient(135deg, #667eea 0%, #764ba2 45%, #2b32b2 100%)"
+};
+
+const loadingCardStyle = {
+  background: "rgba(255,255,255,0.16)",
+  color: "#fff",
+  padding: "18px 24px",
+  borderRadius: "16px",
+  boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+  backdropFilter: "blur(10px)"
+};
+
+const topErrorWrapStyle = {
+  position: "fixed",
+  top: "16px",
+  left: 0,
+  right: 0,
+  display: "flex",
+  justifyContent: "center",
+  zIndex: 50
+};
+
+const topErrorStyle = {
+  background: "#ffeded",
+  color: "#d93025",
+  border: "1px solid #ffc9c9",
+  padding: "10px 16px",
+  borderRadius: "12px",
+  boxShadow: "0 4px 14px rgba(0,0,0,0.08)"
+};
+
+const switchWrapStyle = {
+  textAlign: "center",
+  marginTop: "18px",
+  fontSize: "16px"
+};
+
+const switchTextStyle = {
+  color: "#333"
+};
+
+const switchButtonStyle = {
+  marginLeft: "8px",
+  border: "none",
+  background: "transparent",
+  color: "#4e54c8",
+  fontWeight: "bold",
+  cursor: "pointer",
+  fontSize: "16px"
+};
+
+export default App;

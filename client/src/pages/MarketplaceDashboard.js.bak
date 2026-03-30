@@ -1,0 +1,356 @@
+import { useEffect, useState } from "react";
+
+function MarketplaceDashboard({ token, user, setPage, onViewListing, onLogout }) {
+  const [myListings, setMyListings] = useState([]);
+  const [favorites, setFavorites] = useState([]);
+  const [inquiries, setInquiries] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const isOwner = user.role === "property_owner";
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+
+      const [listingRes, favoriteRes, inquiryRes] = await Promise.all([
+        fetch("http://localhost:5000/listings/mine", {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch("http://localhost:5000/favorites", {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch(`http://localhost:5000/inquiries/${isOwner ? "received" : "sent"}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+
+      const listingData = await listingRes.json();
+      const favoriteData = await favoriteRes.json();
+      const inquiryData = await inquiryRes.json();
+
+      setMyListings(Array.isArray(listingData) ? listingData : []);
+      setFavorites(Array.isArray(favoriteData) ? favoriteData : []);
+      setInquiries(Array.isArray(inquiryData) ? inquiryData : []);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to load dashboard data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const deleteListing = async (listingId) => {
+    const confirmed = window.confirm("Delete this listing?");
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/listings/${listingId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to delete listing");
+      }
+
+      alert(data.message || "Listing deleted");
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Failed to delete listing");
+    }
+  };
+
+  const updateStatus = async (listingId, status) => {
+    try {
+      const res = await fetch(`http://localhost:5000/listings/${listingId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ status })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to update status");
+      }
+
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Failed to update status");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={pageWrapStyle}>
+        <div style={cardStyle}>Loading dashboard...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={pageWrapStyle}>
+      <div style={heroStyle}>
+        <div>
+          <h1 style={{ margin: 0 }}>
+            {isOwner ? "Property Owner Dashboard" : "Customer Dashboard"}
+          </h1>
+          <p style={{ marginTop: "10px", marginBottom: 0, opacity: 0.92 }}>
+            Manage your listings, inquiries, and saved ads.
+          </p>
+        </div>
+
+        <div style={heroActionsStyle}>
+          <button style={ghostButtonStyle} onClick={() => setPage("marketplace-home")}>
+            Home
+          </button>
+          <button style={mainButtonStyle} onClick={() => setPage("post-listing")}>
+            {isOwner ? "Post Property" : "Post Wanted Ad"}
+          </button>
+          <button style={ghostButtonStyle} onClick={() => setPage("favorites")}>
+            Favorites
+          </button>
+          <button style={dangerButtonStyle} onClick={onLogout}>
+            Logout
+          </button>
+        </div>
+      </div>
+
+      <div style={statsGridStyle}>
+        <div style={statCardStyle}>
+          <div style={statNumberStyle}>{myListings.length}</div>
+          <div style={statLabelStyle}>{isOwner ? "My Listings" : "My Wanted Ads"}</div>
+        </div>
+
+        <div style={statCardStyle}>
+          <div style={statNumberStyle}>{inquiries.length}</div>
+          <div style={statLabelStyle}>{isOwner ? "Received Inquiries" : "Sent Inquiries"}</div>
+        </div>
+
+        <div style={statCardStyle}>
+          <div style={statNumberStyle}>{favorites.length}</div>
+          <div style={statLabelStyle}>Saved Favorites</div>
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <h2 style={sectionTitleStyle}>{isOwner ? "My Listings" : "My Wanted Ads"}</h2>
+
+        {myListings.length === 0 ? (
+          <div style={cardStyle}>
+            No listings yet.
+            <div style={{ marginTop: "12px" }}>
+              <button style={mainButtonStyle} onClick={() => setPage("post-listing")}>
+                Create First Listing
+              </button>
+            </div>
+          </div>
+        ) : (
+          myListings.map((listing) => (
+            <div key={listing.id} style={cardStyle}>
+              <h3 style={{ marginTop: 0 }}>{listing.title}</h3>
+              <p style={{ color: "#666" }}>
+                {[listing.suburb, listing.city, listing.state].filter(Boolean).join(", ")}
+              </p>
+              <p><b>Type:</b> {listing.listing_type}</p>
+              <p><b>Status:</b> {listing.status}</p>
+              <p><b>Price:</b> {listing.price ? `$${listing.price}` : "Price on request"}</p>
+
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "12px" }}>
+                <button style={mainButtonStyle} onClick={() => onViewListing(listing.id)}>
+                  View Detail
+                </button>
+
+                <select
+                  value={listing.status}
+                  onChange={(e) => updateStatus(listing.id, e.target.value)}
+                  style={selectStyle}
+                >
+                  <option value="active">active</option>
+                  <option value="pending">pending</option>
+                  <option value="rented">rented</option>
+                  <option value="sold">sold</option>
+                  <option value="closed">closed</option>
+                </select>
+
+                <button
+                  style={dangerButtonStyle}
+                  onClick={() => deleteListing(listing.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div style={sectionStyle}>
+        <h2 style={sectionTitleStyle}>
+          {isOwner ? "Received Inquiries" : "Sent Inquiries"}
+        </h2>
+
+        {inquiries.length === 0 ? (
+          <div style={cardStyle}>No inquiries yet.</div>
+        ) : (
+          inquiries.map((item) => (
+            <div key={item.id} style={cardStyle}>
+              <h3 style={{ marginTop: 0 }}>{item.title}</h3>
+              <p><b>Status:</b> {item.status}</p>
+              {!isOwner && <p><b>Sent message:</b> {item.message}</p>}
+              {isOwner && <p><b>Message:</b> {item.message}</p>}
+              {isOwner && <p><b>Sender:</b> {item.sender_name || item.sender_email || "Unknown"}</p>}
+              {item.phone && <p><b>Phone:</b> {item.phone}</p>}
+              <p><b>Created:</b> {new Date(item.created_at).toLocaleString()}</p>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div style={sectionStyle}>
+        <h2 style={sectionTitleStyle}>Favorites</h2>
+
+        {favorites.length === 0 ? (
+          <div style={cardStyle}>No favorites saved yet.</div>
+        ) : (
+          favorites.slice(0, 4).map((fav) => (
+            <div key={fav.id || fav.favorite_id} style={cardStyle}>
+              <h3 style={{ marginTop: 0 }}>{fav.title}</h3>
+              <p style={{ color: "#666" }}>
+                {[fav.suburb, fav.city, fav.state].filter(Boolean).join(", ")}
+              </p>
+              <p><b>Price:</b> {fav.price ? `$${fav.price}` : "Price on request"}</p>
+
+              <button style={mainButtonStyle} onClick={() => onViewListing(fav.id || fav.listing_id)}>
+                View Listing
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+const pageWrapStyle = {
+  maxWidth: "1180px",
+  margin: "0 auto",
+  padding: "28px 20px 40px"
+};
+
+const heroStyle = {
+  background: "linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%)",
+  borderRadius: "22px",
+  padding: "28px",
+  color: "#fff",
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "18px",
+  flexWrap: "wrap",
+  marginBottom: "24px",
+  boxShadow: "0 18px 36px rgba(78,84,200,0.28)"
+};
+
+const heroActionsStyle = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  alignItems: "center"
+};
+
+const statsGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "16px",
+  marginBottom: "26px"
+};
+
+const statCardStyle = {
+  background: "#fff",
+  borderRadius: "18px",
+  padding: "22px",
+  boxShadow: "0 8px 22px rgba(0,0,0,0.08)",
+  border: "1px solid #edf0f6"
+};
+
+const statNumberStyle = {
+  fontSize: "34px",
+  fontWeight: "700",
+  color: "#4e54c8"
+};
+
+const statLabelStyle = {
+  marginTop: "8px",
+  color: "#666"
+};
+
+const sectionStyle = {
+  marginBottom: "28px"
+};
+
+const sectionTitleStyle = {
+  marginBottom: "16px",
+  color: "#1d1d1f"
+};
+
+const cardStyle = {
+  background: "#fff",
+  borderRadius: "18px",
+  padding: "22px",
+  boxShadow: "0 8px 22px rgba(0,0,0,0.08)",
+  border: "1px solid #edf0f6",
+  marginBottom: "16px"
+};
+
+const selectStyle = {
+  padding: "10px 12px",
+  borderRadius: "10px",
+  border: "1px solid #d7dce5",
+  background: "#fff"
+};
+
+const mainButtonStyle = {
+  padding: "11px 16px",
+  border: "none",
+  borderRadius: "12px",
+  background: "linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%)",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+const ghostButtonStyle = {
+  padding: "11px 16px",
+  border: "1px solid #d7dce5",
+  borderRadius: "12px",
+  background: "#fff",
+  color: "#333",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+const dangerButtonStyle = {
+  padding: "11px 16px",
+  border: "none",
+  borderRadius: "12px",
+  background: "#ff6b6b",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+export default MarketplaceDashboard;

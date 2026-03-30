@@ -1,0 +1,253 @@
+// client/src/Jobs.js
+
+import { useState, useEffect } from "react";
+
+function Jobs({ token, user }) {
+  const [jobs, setJobs] = useState([]);
+
+  // Employer 创建 Job 表单
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    location: "",
+    pay_rate: "",
+    job_date: ""
+  });
+
+  // Worker 申请 Job 表单
+  const [applyJobId, setApplyJobId] = useState(null);
+  const [application, setApplication] = useState({
+    phone: "",
+    resume: null,
+    cover_letter: ""
+  });
+
+  // 获取 jobs
+  const fetchJobs = () => {
+    fetch("http://localhost:5000/jobs")
+      .then(res => res.json())
+      .then(data => setJobs(data))
+      .catch(err => console.error(err));
+  };
+
+  useEffect(() => {
+    fetchJobs();
+  }, []);
+
+  // Employer 创建 Job 输入
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  // Employer 创建 Job 提交
+  const createJob = async (e) => {
+    e.preventDefault();
+
+    const res = await fetch("http://localhost:5000/jobs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(form)
+    });
+
+    const data = await res.json();
+    alert(data.message);
+
+    setForm({
+      title: "",
+      description: "",
+      location: "",
+      pay_rate: "",
+      job_date: ""
+    });
+
+    fetchJobs();
+  };
+
+  // Worker 提交申请（包含上传 Resume）
+  const submitApplication = async (e, jobId) => {
+    e.preventDefault();
+
+    const formData = new FormData();
+    formData.append("phone", application.phone);
+    formData.append("cover_letter", application.cover_letter);
+    if (application.resume) {
+      formData.append("resume", application.resume);
+    }
+
+    const res = await fetch(`http://localhost:5000/jobs/${jobId}/apply`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    const data = await res.json();
+    alert(data.message);
+
+    // 清空申请表单
+    setApplyJobId(null);
+    setApplication({ phone: "", resume: null, cover_letter: "" });
+  };
+
+  return (
+    <div style={{ padding: "20px" }}>
+      <h2>Jobs</h2>
+
+      {jobs.map(job => (
+        <div
+          key={job.id}
+          style={{
+            border: "1px solid #ddd",
+            padding: "15px",
+            marginBottom: "15px",
+            borderRadius: "8px",
+            background: "#fafafa"
+          }}
+        >
+          <h3>{job.title}</h3>
+          <p>{job.description}</p>
+          <p><b>Location:</b> {job.location}</p>
+          <p><b>Pay:</b> ${job.pay_rate}</p>
+          <p><b>Date:</b> {job.job_date}</p>
+          <p><b>Employer:</b> {job.employer_name}</p>
+
+          {/* Worker Apply */}
+          {user.role === "worker" && (
+            <div>
+              <button
+                onClick={() => setApplyJobId(job.id)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: "#4CAF50",
+                  color: "white",
+                  cursor: "pointer"
+                }}
+              >
+                Apply
+              </button>
+
+              {applyJobId === job.id && (
+                <form
+                  onSubmit={(e) => submitApplication(e, job.id)}
+                  style={{
+                    marginTop: "15px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    maxWidth: "400px"
+                  }}
+                >
+                  <input
+                    placeholder="Phone"
+                    value={application.phone}
+                    onChange={e =>
+                      setApplication({ ...application, phone: e.target.value })
+                    }
+                  />
+
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={e =>
+                      setApplication({ ...application, resume: e.target.files[0] })
+                    }
+                  />
+
+                  <textarea
+                    placeholder="Cover letter"
+                    value={application.cover_letter}
+                    onChange={e =>
+                      setApplication({ ...application, cover_letter: e.target.value })
+                    }
+                  />
+
+                  <button
+                    type="submit"
+                    style={{
+                      padding: "8px",
+                      border: "none",
+                      borderRadius: "6px",
+                      background: "#2196F3",
+                      color: "white",
+                      cursor: "pointer"
+                    }}
+                  >
+                    Submit Application
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Employer Create Job */}
+      {user.role === "employer" && (
+        <div style={{ marginTop: "40px" }}>
+          <h3>Create Job</h3>
+          <form
+            onSubmit={createJob}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+              maxWidth: "400px"
+            }}
+          >
+            <input
+              name="title"
+              placeholder="Title"
+              value={form.title}
+              onChange={handleChange}
+            />
+            <input
+              name="description"
+              placeholder="Description"
+              value={form.description}
+              onChange={handleChange}
+            />
+            <input
+              name="location"
+              placeholder="Location"
+              value={form.location}
+              onChange={handleChange}
+            />
+            <input
+              name="pay_rate"
+              placeholder="Pay rate"
+              value={form.pay_rate}
+              onChange={handleChange}
+            />
+            <input
+              name="job_date"
+              type="date"
+              value={form.job_date}
+              onChange={handleChange}
+            />
+            <button
+              type="submit"
+              style={{
+                padding: "10px",
+                border: "none",
+                borderRadius: "6px",
+                background: "#6B73FF",
+                color: "white",
+                cursor: "pointer"
+              }}
+            >
+              Create Job
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default Jobs;

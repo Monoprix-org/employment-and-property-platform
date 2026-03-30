@@ -1,0 +1,460 @@
+import { useEffect, useState } from "react";
+
+const typeLabelMap = {
+  rent_out: "For Rent",
+  sell_out: "For Sale",
+  rent_wanted: "Wanted Rent",
+  buy_wanted: "Wanted Buy"
+};
+
+const propertyTypeLabelMap = {
+  apartment: "Apartment",
+  house: "House",
+  room: "Room",
+  studio: "Studio",
+  townhouse: "Townhouse",
+  land: "Land",
+  commercial: "Commercial",
+  other: "Other"
+};
+
+function MarketplaceHome({ token, user, setPage, onViewListing, onLogout }) {
+  const [filters, setFilters] = useState({
+    listingType: "rent_out",
+    keyword: "",
+    city: "",
+    propertyType: "",
+    bedrooms: "",
+    minPrice: "",
+    maxPrice: ""
+  });
+  const [listings, setListings] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const fetchListings = async (currentFilters = filters) => {
+    try {
+      setLoading(true);
+      setErrorMsg("");
+
+      const params = new URLSearchParams();
+
+      if (currentFilters.listingType) params.append("listingType", currentFilters.listingType);
+      if (currentFilters.keyword) params.append("keyword", currentFilters.keyword);
+      if (currentFilters.city) params.append("city", currentFilters.city);
+      if (currentFilters.propertyType) params.append("propertyType", currentFilters.propertyType);
+      if (currentFilters.bedrooms) params.append("bedrooms", currentFilters.bedrooms);
+      if (currentFilters.minPrice) params.append("minPrice", currentFilters.minPrice);
+      if (currentFilters.maxPrice) params.append("maxPrice", currentFilters.maxPrice);
+
+      const res = await fetch(`http://localhost:5000/listings?${params.toString()}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to fetch listings");
+      }
+
+      setListings(data);
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(err.message || "Failed to fetch listings");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchListings({
+      ...filters,
+      listingType: filters.listingType
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.listingType]);
+
+  const handleSearch = () => {
+    fetchListings();
+  };
+
+  const toggleFavorite = async (listingId) => {
+    try {
+      const res = await fetch(`http://localhost:5000/favorites/${listingId}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+      alert(data.message || "Updated favorites");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update favorite");
+    }
+  };
+
+  const pageTitle =
+    user.role === "property_owner"
+      ? "Property Marketplace"
+      : "Find Homes & Post Wanted Ads";
+
+  return (
+    <div style={pageWrapStyle}>
+      <div style={heroStyle}>
+        <div>
+          <h1 style={heroTitleStyle}>{pageTitle}</h1>
+          <p style={heroSubtitleStyle}>
+            Browse rentals, sales, and wanted ads in one place.
+          </p>
+        </div>
+
+        <div style={heroButtonGroupStyle}>
+          <button style={ghostButtonStyle} onClick={() => setPage("marketplace-dashboard")}>
+            Dashboard
+          </button>
+          <button style={mainButtonStyle} onClick={() => setPage("post-listing")}>
+            {user.role === "property_owner" ? "Post Property" : "Post Wanted Ad"}
+          </button>
+          <button style={ghostButtonStyle} onClick={() => setPage("favorites")}>
+            Favorites
+          </button>
+          <button style={dangerButtonStyle} onClick={onLogout}>
+            Logout
+          </button>
+        </div>
+      </div>
+
+      <div style={filterCardStyle}>
+        <div style={toggleWrapStyle}>
+          {Object.entries(typeLabelMap).map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setFilters({ ...filters, listingType: value })}
+              style={{
+                ...toggleButtonStyle,
+                ...(filters.listingType === value ? activeToggleButtonStyle : {})
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div style={filterGridStyle}>
+          <input
+            placeholder="Keyword"
+            value={filters.keyword}
+            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+            style={inputStyle}
+          />
+
+          <input
+            placeholder="City / Suburb"
+            value={filters.city}
+            onChange={(e) => setFilters({ ...filters, city: e.target.value })}
+            style={inputStyle}
+          />
+
+          <select
+            value={filters.propertyType}
+            onChange={(e) => setFilters({ ...filters, propertyType: e.target.value })}
+            style={inputStyle}
+          >
+            <option value="">All property types</option>
+            <option value="apartment">Apartment</option>
+            <option value="house">House</option>
+            <option value="room">Room</option>
+            <option value="studio">Studio</option>
+            <option value="townhouse">Townhouse</option>
+            <option value="land">Land</option>
+            <option value="commercial">Commercial</option>
+            <option value="other">Other</option>
+          </select>
+
+          <input
+            placeholder="Bedrooms"
+            value={filters.bedrooms}
+            onChange={(e) => setFilters({ ...filters, bedrooms: e.target.value })}
+            style={inputStyle}
+          />
+
+          <input
+            placeholder="Min price"
+            value={filters.minPrice}
+            onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
+            style={inputStyle}
+          />
+
+          <input
+            placeholder="Max price"
+            value={filters.maxPrice}
+            onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
+            style={inputStyle}
+          />
+        </div>
+
+        <div style={{ marginTop: "14px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <button onClick={handleSearch} style={mainButtonStyle}>
+            Search
+          </button>
+          <button
+            onClick={() => {
+              const reset = {
+                listingType: "rent_out",
+                keyword: "",
+                city: "",
+                propertyType: "",
+                bedrooms: "",
+                minPrice: "",
+                maxPrice: ""
+              };
+              setFilters(reset);
+              fetchListings(reset);
+            }}
+            style={ghostButtonStyle}
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+
+      {errorMsg && <div style={errorBoxStyle}>{errorMsg}</div>}
+
+      {loading ? (
+        <div style={cardStyle}>Loading listings...</div>
+      ) : listings.length === 0 ? (
+        <div style={cardStyle}>No listings found.</div>
+      ) : (
+        <div style={listingGridStyle}>
+          {listings.map((listing) => (
+            <div key={listing.id} style={listingCardStyle}>
+              <div style={imagePlaceholderStyle}>
+                {typeLabelMap[listing.listing_type] || "Listing"}
+              </div>
+
+              <h3 style={{ marginTop: 0, marginBottom: "10px" }}>{listing.title}</h3>
+
+              <p style={priceStyle}>
+                {listing.price ? `$${Number(listing.price).toLocaleString()}` : "Price on request"}
+              </p>
+
+              <p style={metaStyle}>
+                {[listing.suburb, listing.city, listing.state].filter(Boolean).join(", ") || "Location not provided"}
+              </p>
+
+              <p style={metaStyle}>
+                {propertyTypeLabelMap[listing.property_type] || "Property"} ·
+                {" "}
+                {listing.bedrooms ?? "-"} bed · {listing.bathrooms ?? "-"} bath
+              </p>
+
+              <p style={descStyle}>
+                {listing.description?.length > 110
+                  ? `${listing.description.slice(0, 110)}...`
+                  : listing.description}
+              </p>
+
+              <div style={cardActionsStyle}>
+                <button
+                  onClick={() => onViewListing(listing.id)}
+                  style={mainButtonStyle}
+                >
+                  View Details
+                </button>
+
+                <button
+                  onClick={() => toggleFavorite(listing.id)}
+                  style={ghostButtonStyle}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const pageWrapStyle = {
+  maxWidth: "1220px",
+  margin: "0 auto",
+  padding: "28px 20px 40px"
+};
+
+const heroStyle = {
+  background: "linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%)",
+  borderRadius: "22px",
+  padding: "28px",
+  color: "#fff",
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "18px",
+  flexWrap: "wrap",
+  marginBottom: "24px",
+  boxShadow: "0 18px 36px rgba(78,84,200,0.28)"
+};
+
+const heroTitleStyle = {
+  margin: 0,
+  fontSize: "34px"
+};
+
+const heroSubtitleStyle = {
+  marginTop: "10px",
+  marginBottom: 0,
+  opacity: 0.9
+};
+
+const heroButtonGroupStyle = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  alignItems: "center"
+};
+
+const filterCardStyle = {
+  background: "#fff",
+  borderRadius: "18px",
+  padding: "20px",
+  boxShadow: "0 8px 24px rgba(0,0,0,0.07)",
+  border: "1px solid #edf0f6",
+  marginBottom: "22px"
+};
+
+const toggleWrapStyle = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginBottom: "18px"
+};
+
+const toggleButtonStyle = {
+  padding: "10px 14px",
+  borderRadius: "999px",
+  border: "1px solid #d7dce5",
+  background: "#fff",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+const activeToggleButtonStyle = {
+  background: "#4e54c8",
+  color: "#fff",
+  borderColor: "#4e54c8"
+};
+
+const filterGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "12px"
+};
+
+const inputStyle = {
+  padding: "12px 14px",
+  borderRadius: "12px",
+  border: "1px solid #d7dce5",
+  outline: "none",
+  fontSize: "15px",
+  background: "#fff"
+};
+
+const listingGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+  gap: "18px"
+};
+
+const listingCardStyle = {
+  background: "#fff",
+  borderRadius: "18px",
+  padding: "18px",
+  boxShadow: "0 8px 22px rgba(0,0,0,0.06)",
+  border: "1px solid #edf0f6"
+};
+
+const imagePlaceholderStyle = {
+  height: "150px",
+  borderRadius: "14px",
+  marginBottom: "14px",
+  background: "linear-gradient(135deg, #eef1ff 0%, #dfe5ff 100%)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#4e54c8",
+  fontWeight: "700"
+};
+
+const priceStyle = {
+  margin: "0 0 8px",
+  color: "#4e54c8",
+  fontWeight: "700",
+  fontSize: "20px"
+};
+
+const metaStyle = {
+  margin: "0 0 8px",
+  color: "#666"
+};
+
+const descStyle = {
+  color: "#444",
+  lineHeight: 1.6,
+  minHeight: "50px"
+};
+
+const cardActionsStyle = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginTop: "14px"
+};
+
+const cardStyle = {
+  background: "#fff",
+  borderRadius: "16px",
+  padding: "20px",
+  boxShadow: "0 8px 22px rgba(0,0,0,0.08)",
+  border: "1px solid #edf0f6"
+};
+
+const errorBoxStyle = {
+  marginBottom: "16px",
+  background: "#ffeded",
+  color: "#d93025",
+  border: "1px solid #ffc9c9",
+  padding: "12px 14px",
+  borderRadius: "12px"
+};
+
+const mainButtonStyle = {
+  padding: "11px 16px",
+  border: "none",
+  borderRadius: "12px",
+  background: "linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%)",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+const ghostButtonStyle = {
+  padding: "11px 16px",
+  border: "1px solid #d7dce5",
+  borderRadius: "12px",
+  background: "#fff",
+  color: "#333",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+const dangerButtonStyle = {
+  padding: "11px 16px",
+  border: "none",
+  borderRadius: "12px",
+  background: "#ff6b6b",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+export default MarketplaceHome;

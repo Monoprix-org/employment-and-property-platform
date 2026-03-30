@@ -1,0 +1,178 @@
+import { useEffect, useState } from "react";
+
+function FavoritesPage({ token, setPage, onViewListing, onLogout }) {
+  const [favorites, setFavorites] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchFavorites = async () => {
+    try {
+      setLoading(true);
+
+      const res = await fetch("http://localhost:5000/favorites", {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to fetch favorites");
+      }
+
+      setFavorites(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Failed to fetch favorites");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFavorites();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const removeFavorite = async (listingId) => {
+    try {
+      const res = await fetch(`http://localhost:5000/favorites/${listingId}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to update favorite");
+      }
+
+      fetchFavorites();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Failed to remove favorite");
+    }
+  };
+
+  return (
+    <div style={pageWrapStyle}>
+      <div style={headerBarStyle}>
+        <div>
+          <h1 style={{ margin: 0 }}>Favorites</h1>
+          <p style={{ color: "#666", marginTop: "8px" }}>
+            View and manage your saved listings.
+          </p>
+        </div>
+
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <button style={ghostButtonStyle} onClick={() => setPage("marketplace-home")}>
+            Home
+          </button>
+          <button style={ghostButtonStyle} onClick={() => setPage("marketplace-dashboard")}>
+            Dashboard
+          </button>
+          <button style={dangerButtonStyle} onClick={onLogout}>
+            Logout
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={cardStyle}>Loading favorites...</div>
+      ) : favorites.length === 0 ? (
+        <div style={cardStyle}>You have no saved listings yet.</div>
+      ) : (
+        <div style={gridStyle}>
+          {favorites.map((fav) => (
+            <div key={fav.favorite_id || `${fav.user_id}-${fav.listing_id}`} style={cardStyle}>
+              <h3 style={{ marginTop: 0 }}>{fav.title}</h3>
+              <p style={{ color: "#666" }}>
+                {[fav.suburb, fav.city, fav.state].filter(Boolean).join(", ")}
+              </p>
+              <p><b>Type:</b> {fav.listing_type}</p>
+              <p><b>Price:</b> {fav.price ? `$${fav.price}` : "Price on request"}</p>
+
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "14px" }}>
+                <button
+                  style={mainButtonStyle}
+                  onClick={() => onViewListing(fav.id || fav.listing_id)}
+                >
+                  View Listing
+                </button>
+
+                <button
+                  style={ghostButtonStyle}
+                  onClick={() => removeFavorite(fav.id || fav.listing_id)}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const pageWrapStyle = {
+  maxWidth: "1180px",
+  margin: "0 auto",
+  padding: "28px 20px 40px"
+};
+
+const headerBarStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "16px",
+  flexWrap: "wrap",
+  marginBottom: "22px"
+};
+
+const gridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+  gap: "18px"
+};
+
+const cardStyle = {
+  background: "#fff",
+  borderRadius: "18px",
+  padding: "22px",
+  boxShadow: "0 8px 22px rgba(0,0,0,0.08)",
+  border: "1px solid #edf0f6"
+};
+
+const mainButtonStyle = {
+  padding: "11px 16px",
+  border: "none",
+  borderRadius: "12px",
+  background: "linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%)",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+const ghostButtonStyle = {
+  padding: "11px 16px",
+  border: "1px solid #d7dce5",
+  borderRadius: "12px",
+  background: "#fff",
+  color: "#333",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+const dangerButtonStyle = {
+  padding: "11px 16px",
+  border: "none",
+  borderRadius: "12px",
+  background: "#ff6b6b",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+export default FavoritesPage;

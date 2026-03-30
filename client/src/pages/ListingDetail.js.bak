@@ -1,0 +1,358 @@
+import { useEffect, useState } from "react";
+
+const typeLabelMap = {
+  rent_out: "For Rent",
+  sell_out: "For Sale",
+  rent_wanted: "Wanted Rent",
+  buy_wanted: "Wanted Buy"
+};
+
+function ListingDetail({ token, user, listingId, setPage, onLogout }) {
+  const [listing, setListing] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [message, setMessage] = useState("");
+  const [phone, setPhone] = useState("");
+
+  useEffect(() => {
+    const fetchListing = async () => {
+      if (!listingId) {
+        setLoading(false);
+        setErrorMsg("No listing selected.");
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setErrorMsg("");
+
+        const res = await fetch(`http://localhost:5000/listings/${listingId}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.message || "Failed to fetch listing");
+        }
+
+        setListing(data);
+      } catch (err) {
+        console.error(err);
+        setErrorMsg(err.message || "Failed to fetch listing");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchListing();
+  }, [listingId]);
+
+  const handleInquiry = async (e) => {
+    e.preventDefault();
+
+    try {
+      const res = await fetch("http://localhost:5000/inquiries", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          listing_id: listingId,
+          message,
+          phone
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to send inquiry");
+      }
+
+      alert(data.message || "Inquiry sent successfully");
+      setMessage("");
+      setPhone("");
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Failed to send inquiry");
+    }
+  };
+
+  const toggleFavorite = async () => {
+    try {
+      const res = await fetch(`http://localhost:5000/favorites/${listingId}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+      alert(data.message || "Updated favorites");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update favorite");
+    }
+  };
+
+  const goBackHome = () => {
+    setPage("marketplace-home");
+  };
+
+  const goDashboard = () => {
+    setPage("marketplace-dashboard");
+  };
+
+  if (loading) {
+    return (
+      <div style={pageWrapStyle}>
+        <div style={cardStyle}>Loading listing details...</div>
+      </div>
+    );
+  }
+
+  if (errorMsg || !listing) {
+    return (
+      <div style={pageWrapStyle}>
+        <div style={cardStyle}>
+          <p>{errorMsg || "Listing not found."}</p>
+          <button style={mainButtonStyle} onClick={goBackHome}>
+            Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isOwnListing = listing.user_id === user.id;
+
+  return (
+    <div style={pageWrapStyle}>
+      <div style={headerBarStyle}>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <button style={ghostButtonStyle} onClick={goBackHome}>
+            Back to Home
+          </button>
+          <button style={ghostButtonStyle} onClick={goDashboard}>
+            Dashboard
+          </button>
+          <button style={ghostButtonStyle} onClick={() => setPage("favorites")}>
+            Favorites
+          </button>
+        </div>
+
+        <button style={dangerButtonStyle} onClick={onLogout}>
+          Logout
+        </button>
+      </div>
+
+      <div style={detailLayoutStyle}>
+        <div style={mainColumnStyle}>
+          <div style={heroImageStyle}>
+            {typeLabelMap[listing.listing_type] || "Listing"}
+          </div>
+
+          <div style={cardStyle}>
+            <h1 style={{ marginTop: 0 }}>{listing.title}</h1>
+            <p style={priceStyle}>
+              {listing.price ? `$${Number(listing.price).toLocaleString()}` : "Price on request"}
+            </p>
+
+            <p style={metaStyle}>
+              {[listing.address_line, listing.suburb, listing.city, listing.state, listing.postcode]
+                .filter(Boolean)
+                .join(", ")}
+            </p>
+
+            <div style={chipWrapStyle}>
+              <span style={chipStyle}>{listing.property_type || "Property"}</span>
+              <span style={chipStyle}>{listing.bedrooms ?? "-"} bed</span>
+              <span style={chipStyle}>{listing.bathrooms ?? "-"} bath</span>
+              <span style={chipStyle}>{listing.car_spaces ?? "-"} car</span>
+              <span style={chipStyle}>{listing.area_size ?? "-"} sqm</span>
+              <span style={chipStyle}>{listing.status || "active"}</span>
+            </div>
+
+            <h3>Description</h3>
+            <p style={descriptionStyle}>{listing.description}</p>
+          </div>
+        </div>
+
+        <div style={sideColumnStyle}>
+          <div style={cardStyle}>
+            <h3 style={{ marginTop: 0 }}>Contact</h3>
+            <p><b>Name:</b> {listing.contact_name || listing.author_name || "Not provided"}</p>
+            <p><b>Phone:</b> {listing.contact_phone || listing.author_phone || "Not provided"}</p>
+            <p><b>Posted by:</b> {listing.author_name || "Unknown"}</p>
+
+            <button style={{ ...mainButtonStyle, width: "100%", marginTop: "8px" }} onClick={toggleFavorite}>
+              Save to Favorites
+            </button>
+          </div>
+
+          {!isOwnListing && (
+            <div style={cardStyle}>
+              <h3 style={{ marginTop: 0 }}>Send Inquiry</h3>
+
+              <form onSubmit={handleInquiry} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <input
+                  placeholder="Your phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  style={inputStyle}
+                />
+
+                <textarea
+                  placeholder="Write your message here..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows="6"
+                  required
+                  style={{ ...inputStyle, resize: "vertical" }}
+                />
+
+                <button type="submit" style={mainButtonStyle}>
+                  Send Inquiry
+                </button>
+              </form>
+            </div>
+          )}
+
+          {isOwnListing && (
+            <div style={cardStyle}>
+              <h3 style={{ marginTop: 0 }}>Your Listing</h3>
+              <p>You posted this ad. You can manage it from your dashboard.</p>
+              <button style={mainButtonStyle} onClick={goDashboard}>
+                Go to Dashboard
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const pageWrapStyle = {
+  maxWidth: "1200px",
+  margin: "0 auto",
+  padding: "28px 20px 40px"
+};
+
+const headerBarStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "14px",
+  flexWrap: "wrap",
+  marginBottom: "18px"
+};
+
+const detailLayoutStyle = {
+  display: "grid",
+  gridTemplateColumns: "2fr 1fr",
+  gap: "20px",
+  alignItems: "start"
+};
+
+const mainColumnStyle = {
+  minWidth: 0
+};
+
+const sideColumnStyle = {
+  minWidth: 0
+};
+
+const heroImageStyle = {
+  height: "300px",
+  borderRadius: "18px",
+  marginBottom: "18px",
+  background: "linear-gradient(135deg, #eef1ff 0%, #dfe5ff 100%)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#4e54c8",
+  fontWeight: "700",
+  fontSize: "24px"
+};
+
+const cardStyle = {
+  background: "#fff",
+  borderRadius: "18px",
+  padding: "22px",
+  boxShadow: "0 8px 22px rgba(0,0,0,0.08)",
+  border: "1px solid #edf0f6",
+  marginBottom: "18px"
+};
+
+const priceStyle = {
+  margin: "0 0 10px",
+  color: "#4e54c8",
+  fontWeight: "700",
+  fontSize: "24px"
+};
+
+const metaStyle = {
+  marginBottom: "16px",
+  color: "#666"
+};
+
+const chipWrapStyle = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginBottom: "18px"
+};
+
+const chipStyle = {
+  padding: "8px 12px",
+  borderRadius: "999px",
+  background: "#f2f4f8",
+  color: "#333",
+  fontWeight: "700",
+  fontSize: "13px"
+};
+
+const descriptionStyle = {
+  lineHeight: 1.7,
+  color: "#444"
+};
+
+const inputStyle = {
+  padding: "12px 14px",
+  borderRadius: "12px",
+  border: "1px solid #d7dce5",
+  outline: "none",
+  fontSize: "15px",
+  background: "#fff"
+};
+
+const mainButtonStyle = {
+  padding: "11px 16px",
+  border: "none",
+  borderRadius: "12px",
+  background: "linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%)",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+const ghostButtonStyle = {
+  padding: "11px 16px",
+  border: "1px solid #d7dce5",
+  borderRadius: "12px",
+  background: "#fff",
+  color: "#333",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+const dangerButtonStyle = {
+  padding: "11px 16px",
+  border: "none",
+  borderRadius: "12px",
+  background: "#ff6b6b",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+export default ListingDetail;

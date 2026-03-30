@@ -1,0 +1,98 @@
+// client/src/pages/JobsPage.js
+
+import React, { useState, useEffect } from "react";
+import JobCard from "../components/JobCard";
+
+function JobsPage({ token, user }) {
+  const [jobs, setJobs] = useState([]);
+  const [applyJobId, setApplyJobId] = useState(null);
+  const [application, setApplication] = useState({ phone: "", resume: null, cover_letter: "" });
+  const [search, setSearch] = useState("");
+  const [filterLocation, setFilterLocation] = useState("");
+
+  const fetchJobs = () => {
+    fetch("http://localhost:5000/jobs")
+      .then(res => res.json())
+      .then(data => setJobs(data))
+      .catch(err => console.error(err));
+  };
+
+  useEffect(() => fetchJobs(), []);
+
+  const handleApply = async (e, jobId) => {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append("phone", application.phone);
+    formData.append("cover_letter", application.cover_letter);
+    if (application.resume) formData.append("resume", application.resume);
+
+    const res = await fetch(`http://localhost:5000/jobs/${jobId}/apply`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData
+    });
+
+    const data = await res.json();
+    alert(data.message);
+    setApplyJobId(null);
+    setApplication({ phone: "", resume: null, cover_letter: "" });
+  };
+
+  // 搜索和过滤
+  const filteredJobs = jobs.filter(job =>
+    job.title.toLowerCase().includes(search.toLowerCase()) &&
+    job.location.toLowerCase().includes(filterLocation.toLowerCase())
+  );
+
+  return (
+    <div style={{ padding: "20px" }}>
+      <h2>Job Listings</h2>
+
+      <div style={{ marginBottom: "20px", display: "flex", gap: "10px" }}>
+        <input
+          placeholder="Search by title"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ padding: "8px", borderRadius: "6px", flex: 1 }}
+        />
+        <input
+          placeholder="Filter by location"
+          value={filterLocation}
+          onChange={e => setFilterLocation(e.target.value)}
+          style={{ padding: "8px", borderRadius: "6px", flex: 1 }}
+        />
+      </div>
+
+      {filteredJobs.map(job => (
+        <div key={job.id}>
+          <JobCard job={job} onApplyClick={setApplyJobId} user={user} />
+
+          {applyJobId === job.id && user.role === "worker" && (
+            <form onSubmit={(e) => handleApply(e, job.id)} style={{ marginBottom: "20px", maxWidth: "400px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <input
+                placeholder="Phone"
+                value={application.phone}
+                onChange={e => setApplication({ ...application, phone: e.target.value })}
+              />
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={e => setApplication({ ...application, resume: e.target.files[0] })}
+              />
+              <textarea
+                placeholder="Cover letter"
+                value={application.cover_letter}
+                onChange={e => setApplication({ ...application, cover_letter: e.target.value })}
+              />
+              <button type="submit" style={{
+                padding: "8px", border: "none", borderRadius: "6px", background: "#2196F3", color: "white", cursor: "pointer"
+              }}>Submit Application</button>
+            </form>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default JobsPage;

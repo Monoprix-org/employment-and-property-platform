@@ -1,0 +1,205 @@
+import { useEffect, useState } from "react";
+import JobCard from "../components/JobCard";
+
+function JobsPage({ token, user }) {
+  const [jobs, setJobs] = useState([]);
+  const [search, setSearch] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
+  const [applyJobId, setApplyJobId] = useState(null);
+  const [application, setApplication] = useState({
+    phone: "",
+    resume: null,
+    cover_letter: ""
+  });
+
+  useEffect(() => {
+    fetch("http://localhost:5000/jobs")
+      .then((res) => res.json())
+      .then((data) => setJobs(data));
+  }, []);
+
+  const filteredJobs = jobs.filter(
+    (job) =>
+      job.title.toLowerCase().includes(search.toLowerCase()) &&
+      job.location.toLowerCase().includes(locationFilter.toLowerCase())
+  );
+
+  const submitApplication = async (e, jobId) => {
+    e.preventDefault();
+
+    try {
+      const formData = new FormData();
+      formData.append("phone", application.phone);
+      formData.append("cover_letter", application.cover_letter);
+
+      if (application.resume) {
+        formData.append("resume", application.resume);
+      }
+
+      const res = await fetch(`http://localhost:5000/jobs/${jobId}/apply`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await res.json();
+      alert(data.message);
+
+      setApplyJobId(null);
+      setApplication({
+        phone: "",
+        resume: null,
+        cover_letter: ""
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Application failed");
+    }
+  };
+
+  return (
+    <div
+      style={{
+        maxWidth: "980px",
+        margin: "34px auto",
+        padding: "0 20px"
+      }}
+    >
+      <h1 style={{ marginBottom: "20px", color: "#1d1d1f" }}>Job Listings</h1>
+
+      <div
+        style={{
+          display: "flex",
+          gap: "12px",
+          marginBottom: "26px",
+          flexWrap: "wrap"
+        }}
+      >
+        <input
+          placeholder="Search job title..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={searchInputStyle}
+        />
+
+        <input
+          placeholder="Filter location..."
+          value={locationFilter}
+          onChange={(e) => setLocationFilter(e.target.value)}
+          style={searchInputStyle}
+        />
+      </div>
+
+      {filteredJobs.map((job) => (
+        <div key={job.id}>
+          <JobCard job={job} user={user} onApply={setApplyJobId} />
+
+          {applyJobId === job.id && user.role === "worker" && (
+            <form
+              onSubmit={(e) => submitApplication(e, job.id)}
+              style={{
+                background: "#fff",
+                borderRadius: "16px",
+                padding: "20px",
+                boxShadow: "0 8px 22px rgba(0,0,0,0.08)",
+                marginBottom: "22px",
+                border: "1px solid #edf0f6",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px"
+              }}
+            >
+              <h3 style={{ marginTop: 0 }}>Apply for {job.title}</h3>
+
+              <input
+                placeholder="Phone"
+                value={application.phone}
+                onChange={(e) =>
+                  setApplication({ ...application, phone: e.target.value })
+                }
+                style={searchInputStyle}
+              />
+
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={(e) =>
+                  setApplication({
+                    ...application,
+                    resume: e.target.files[0]
+                  })
+                }
+                style={searchInputStyle}
+              />
+
+              <textarea
+                placeholder="Cover letter"
+                value={application.cover_letter}
+                onChange={(e) =>
+                  setApplication({
+                    ...application,
+                    cover_letter: e.target.value
+                  })
+                }
+                rows="5"
+                style={{
+                  ...searchInputStyle,
+                  resize: "vertical"
+                }}
+              />
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button type="submit" style={mainButtonStyle}>
+                  Submit Application
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setApplyJobId(null)}
+                  style={secondaryButtonStyle}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const searchInputStyle = {
+  flex: 1,
+  minWidth: "280px",
+  padding: "12px 14px",
+  borderRadius: "10px",
+  border: "1px solid #d7dce5",
+  outline: "none",
+  fontSize: "15px",
+  background: "white"
+};
+
+const mainButtonStyle = {
+  padding: "10px 16px",
+  border: "none",
+  borderRadius: "10px",
+  background: "linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%)",
+  color: "white",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+const secondaryButtonStyle = {
+  padding: "10px 16px",
+  border: "1px solid #d7dce5",
+  borderRadius: "10px",
+  background: "#fff",
+  color: "#333",
+  cursor: "pointer",
+  fontWeight: "700"
+};
+
+export default JobsPage;
